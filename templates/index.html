@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Segmentation GUI</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-right: 2px solid #ddd;
+            padding: 10px;
+        }
+        #toggle-button {
+            width: 100px;
+            margin: 20px 0;
+            padding: 10px;
+            cursor: pointer;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        #image-display {
+            flex: 3;
+            text-align: center;
+            position: relative;
+        }
+        #image-display img {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #ddd;
+            cursor: crosshair;
+        }
+        #image-slider {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-y: auto;
+            max-height: 100vh;
+            padding: 10px;
+            border-left: 2px solid #ddd;
+        }
+        #image-slider img {
+            width: 80px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        #image-slider img:hover {
+            border-color: #007BFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="left-panel">
+        <button id="toggle-button" onclick="toggleAction()">Add</button>
+    </div>
+
+    <div id="image-display">
+        <img id="main-image" src="{{ url_for('get_image', filename=current_image) }}" alt="Select an image" onclick="getClickPosition(event)">
+    </div>
+
+    <div id="image-slider">
+        {% for image in images %}
+            <img src="{{ url_for('get_image', filename=image) }}" alt="{{ image }}" onclick="displayImage('{{ image }}')" {% if image == current_image %} style="border-color: #007BFF;" {% endif %}>
+        {% endfor %}
+    </div>
+
+    <form id="segment-form" method="POST" action="/segment" style="display:none;">
+        <input type="hidden" name="image_name" id="image-name" value="{{ current_image }}">
+        <input type="hidden" name="action_type" id="action-type" value="1">
+        <input type="hidden" name="x_coord" id="x-coord">
+        <input type="hidden" name="y_coord" id="y-coord">
+    </form>
+
+    <script>
+        let selectedAction = 1; // Default to "Add"
+
+        function toggleAction() {
+            // Toggle between Add (1) and Remove (0)
+            if (selectedAction === 1) {
+                selectedAction = 0;
+                document.getElementById('toggle-button').textContent = 'Remove';
+                document.getElementById('toggle-button').style.backgroundColor = '#FF0000';
+            } else {
+                selectedAction = 1;
+                document.getElementById('toggle-button').textContent = 'Add';
+                document.getElementById('toggle-button').style.backgroundColor = '#007BFF';
+            }
+            document.getElementById('action-type').value = selectedAction;
+        }
+
+        function displayImage(imageName) {
+            document.getElementById('main-image').src = '/image/' + imageName;
+            document.getElementById('image-name').value = imageName;
+            window.history.pushState({}, '', '/?image=' + imageName);
+            const images = document.querySelectorAll('#image-slider img');
+            images.forEach(img => {
+                img.style.borderColor = 'transparent';
+            });
+            event.target.style.borderColor = '#007BFF';
+        }
+
+        function getClickPosition(event) {
+            const imgElement = document.getElementById('main-image');
+            const rect = imgElement.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            document.getElementById('x-coord').value = x;
+            document.getElementById('y-coord').value = y;
+
+            // Send an AJAX request to the server to perform segmentation
+            const formData = new FormData(document.getElementById('segment-form'));
+            fetch('/segment', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const overlayImage = data.overlay_image;
+                // Update the main image with the overlay
+                document.getElementById('main-image').src = '/image/' + overlayImage;
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
